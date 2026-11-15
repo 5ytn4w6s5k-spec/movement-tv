@@ -2,6 +2,9 @@
   'use strict';
 
   var GROUP = 'movement';
+  // Shown on the home screen. Raised with every change, so we can always tell
+  // which version the TV is actually running.
+  var APP_VERSION = 9;
   // Raise this when the Android shell changes in a way that needs a reinstall.
   var SHELL_LATEST = 2;
   var W = 1920;
@@ -650,6 +653,7 @@
     return '<div class="topbar"><div class="brand">' + logo + esc(catalog ? catalog.name : 'The Movement Skool') + '</div>' +
       '<div class="spacer"></div>' +
       (withRefresh && shellOutdated() ? '<div class="update-note">App update ready: enter 1080385 in Downloader</div>' : '') +
+      (withRefresh ? '<div class="ver">Version ' + APP_VERSION + '</div>' : '') +
       (withRefresh ? '<div class="btn small" data-f data-key="refresh" data-act="refresh">Refresh</div>' : '') +
       (withBack ? backButton() : '') +
       '</div>';
@@ -1141,6 +1145,13 @@
       if (e && e.kind === 'signin') reset('signin');
       else if (manual) toast(e && e.kind === 'format' ? 'Couldn\'t read Skool\'s pages' : 'Can\'t reach Skool right now');
     });
+  }
+
+  // Say so when a newer version has just arrived.
+  var seenVersion = load('seenVersion', null);
+  if (seenVersion !== APP_VERSION) {
+    if (seenVersion !== null) setTimeout(function () { toast('Updated to version ' + APP_VERSION); }, 1200);
+    save('seenVersion', APP_VERSION);
   }
 
   if (document.fonts && document.fonts.ready) {
