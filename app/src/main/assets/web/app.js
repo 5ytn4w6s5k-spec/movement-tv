@@ -8,6 +8,9 @@
   var H = 1080;
 
   var nativeApp = window.MTVNative || null;
+  // On the TV everything is driven by the remote; elsewhere (Chrome on a laptop) add mouse support.
+  var pointer = !nativeApp;
+  if (pointer) document.documentElement.className += ' pointer';
   var stage = document.getElementById('stage');
   var screenEl = document.getElementById('screen');
   var playerEl = document.getElementById('player');
@@ -409,7 +412,7 @@
   }
 
   function focusables() { return Array.prototype.slice.call(screenEl.querySelectorAll('[data-f]')); }
-  function setFocus(el, instant) {
+  function setFocus(el, instant, noReveal) {
     if (focused && focused !== el) focused.classList.remove('is-f');
     focused = el || null;
     if (!el) return;
@@ -418,7 +421,7 @@
     if (cur) cur.focus = el.getAttribute('data-key');
     var g = el.closest('[data-group]');
     if (g) g.setAttribute('data-last', el.getAttribute('data-key'));
-    reveal(el, instant);
+    if (!noReveal) reveal(el, instant);
   }
   function restoreFocus(cur) {
     var el = null;
@@ -528,6 +531,40 @@
     if (a && actions[a]) actions[a](el);
   }
 
+  if (pointer) {
+    document.addEventListener('click', function (e) {
+      var el = e.target && e.target.closest ? e.target.closest('[data-f]') : null;
+      var cur = current();
+      if (!el && cur && cur.name === 'player' && P.mode === 'play') { togglePlay(); showOverlay(); return; }
+      if (!el || !screenEl.contains(el)) return;
+      e.preventDefault();
+      setFocus(el, false, true);
+      activate(el);
+    });
+    document.addEventListener('mouseover', function (e) {
+      var el = e.target && e.target.closest ? e.target.closest('[data-f]') : null;
+      if (el && el !== focused && screenEl.contains(el)) setFocus(el, false, true);
+    });
+    document.addEventListener('mousemove', function () {
+      var cur = current();
+      if (cur && cur.name === 'player') showOverlay();
+    });
+    document.addEventListener('wheel', function (e) {
+      var node = e.target;
+      while (node && node !== document.body && !(node.getAttribute && node.getAttribute('data-scroll'))) node = node.parentNode;
+      if (!node || node === document.body || !node.getAttribute) return;
+      e.preventDefault();
+      node.style.scrollBehavior = 'auto';
+      var d = (e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 40 : 1) / scale;
+      if (node.getAttribute('data-scroll') === 'x') node.scrollLeft += d;
+      else node.scrollTop += d;
+    }, { passive: false });
+  }
+
+  function backButton(cls) {
+    return pointer ? '<div class="btn small back-btn ' + (cls || '') + '" data-f data-key="back" data-act="goback">Back</div>' : '';
+  }
+
   // Called by the Fire TV app for Back and media buttons.
   window.mtvKey = function (k) { return handle(k); };
   // The Fire TV app asks this before reloading to pick up newer screens.
@@ -553,6 +590,11 @@
     course: function (el) { go('program', { c: el.getAttribute('data-c') }); },
     section: function (el) { go('day', { c: el.getAttribute('data-c'), s: el.getAttribute('data-s') }); },
     refresh: function () { refresh(true); },
+    goback: function () {
+      var cur = current();
+      if (cur && cur.name === 'player') returnToList(P.ctx ? 'v:' + P.ctx.i : null);
+      else back();
+    },
     signin: function () {
       if (nativeApp && nativeApp.signIn) nativeApp.signIn();
       else window.location.href = '/login';
@@ -603,12 +645,13 @@
     return v < SHELL_LATEST;
   }
 
-  function topBar(withRefresh) {
+  function topBar(withRefresh, withBack) {
     var logo = catalog && catalog.logo ? '<img src="' + attr(catalog.logo) + '" alt="">' : '';
     return '<div class="topbar"><div class="brand">' + logo + esc(catalog ? catalog.name : 'The Movement Skool') + '</div>' +
       '<div class="spacer"></div>' +
       (withRefresh && shellOutdated() ? '<div class="update-note">App update ready: enter 1080385 in Downloader</div>' : '') +
       (withRefresh ? '<div class="btn small" data-f data-key="refresh" data-act="refresh">Refresh</div>' : '') +
+      (withBack ? backButton() : '') +
       '</div>';
   }
 
@@ -681,7 +724,7 @@
         return '<div class="grp" data-group="g' + ri + '"><div class="grp-l">' + esc(r.label) + '</div>' + tiles + '</div>';
       }).join('');
 
-      return topBar(false) + side + '<div class="p-main"><div class="vs" data-scroll="y"><div class="vs-inner">' + grid + '</div></div></div>';
+      return topBar(false, true) + side + '<div class="p-main"><div class="vs" data-scroll="y"><div class="vs-inner">' + grid + '</div></div></div>';
     }
   };
 
@@ -705,7 +748,7 @@
         ? '<span class="g">' + esc(s.group) + '</span><span class="b">' + esc(s.label) + '</span>'
         : '<span class="b">' + esc(s.label) + '</span>';
 
-      var head = '<div class="day-head"><div class="titles">' +
+      var head = '<div class="day-head">' + backButton('corner') + '<div class="titles">' +
           '<div class="course">' + esc(c.title) + '</div>' +
           '<div class="name' + (s.kind === 'word' ? ' word' : '') + '" data-fit="40">' + name + '</div></div>' +
         '<div class="prog"><div>' + st.done + ' of ' + plural(st.total, 'exercise', 'exercises') + ' done, about ' + minutes(st.ms) + '</div>' +
@@ -798,6 +841,7 @@
             '<span class="hint"><span class="key">&#9664; &#9654;</span>Back or ahead 10 seconds</span>' +
             '<span class="hint"><span class="key">Back</span>Exercise list</span>' +
           '</div></div>' +
+        backButton('corner on-video') +
         '</div><div id="pl-panel"></div>';
     },
     after: function (p) {
@@ -1087,7 +1131,7 @@
   }
 
   // Exposed for testing in a desktop browser.
-  window.MTV = { boot: boot, state: function () { return { stack: stack, catalog: catalog }; } };
+  window.MTV = { boot: boot, refit: function () { fitAll(screenEl); }, state: function () { return { stack: stack, catalog: catalog }; } };
 
   boot(false);
 })();

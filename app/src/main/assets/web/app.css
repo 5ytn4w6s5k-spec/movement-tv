@@ -328,6 +328,16 @@ body.is-playing #player { display: block; }
 }
 #toast.on { opacity: 1; transform: none; }
 
+/* ---------- mouse and keyboard (Chrome on a laptop) ---------- */
+
+html.pointer, html.pointer body { cursor: default; }
+html.pointer [data-f] { cursor: pointer; }
+.back-btn { margin-left: 20px; }
+.back-btn.corner { position: absolute; top: 36px; right: 112px; margin: 0; z-index: 4; }
+.back-btn.on-video { background: rgba(255, 255, 255, 0.92); color: var(--text); transition: opacity 0.35s ease; }
+.back-btn.on-video.is-f { background: var(--focus); color: #FFFFFF; }
+.pl.quiet .back-btn { opacity: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }

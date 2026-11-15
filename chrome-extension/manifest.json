@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Movement Skool",
+  "version": "1.0.0",
+  "description": "Your Movement Skool programs, days and exercises in a cleaner layout, with the coach's notes next to each video.",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "action": {
+    "default_title": "Open Movement Skool",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.skool.com/__tvapp/*"],
+      "js": ["boot.js", "app.js"],
+      "css": ["app.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["fonts/archivo.woff2", "icons/32.png"],
+      "matches": ["https://www.skool.com/*"]
+    }
+  ]
+}

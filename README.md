@@ -18,6 +18,10 @@ A Fire TV app for The Movement Skool. It signs in to Skool once, then shows ever
 | Rewind / fast-forward | | Back or ahead 10 seconds |
 | Back | Go back a screen | Back to the exercise list |
 
+## On a laptop (Chrome)
+
+The `chrome-extension/` folder is the same app as a Chrome extension. Each release includes `MovementSkool-Chrome.zip`; see `chrome-extension/README.md` to install it.
+
 ## How it works
 
 - `app/src/main/assets/web/` holds the screens (HTML, CSS, JavaScript).
