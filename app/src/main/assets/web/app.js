@@ -672,10 +672,9 @@
   screens.home = {
     valid: function () { return !!(catalog && catalog.courses && catalog.courses.length); },
     html: function () {
-      var inProgress = continueCourse();
-      var cards = catalog.courses.map(function (c) {
+      var cards = catalog.courses.map(function (c, ci) {
         var cs = courseStats(c);
-        return '<div class="pcard" data-f' + (c === inProgress ? ' data-default' : '') + ' data-key="c:' + attr(c.id) + '" data-act="course" data-c="' + attr(c.id) + '">' +
+        return '<div class="pcard" data-f' + (ci === 0 ? ' data-default' : '') + ' data-key="c:' + attr(c.id) + '" data-act="course" data-c="' + attr(c.id) + '">' +
           '<div class="img" data-bg="' + attr(c.cover) + '"></div>' +
           '<div class="body"><div class="ttl">' + esc(c.title) + '</div>' + pill(cs.done, cs.total) + '</div></div>';
       }).join('');
@@ -714,7 +713,7 @@
           var head = s.kind === 'word'
             ? '<div class="nm">' + esc(s.label) + '</div>'
             : '<div class="dn" data-fit="34"><span class="dd">' + esc(s.kind === 'day' ? 'Day' : (s.prefix || '')) + '</span>' + esc(s.big) + '</div>';
-          return '<div class="' + cls + '" data-f' + (s === ns ? ' data-default' : '') + ' data-key="s:' + attr(s.id) + '" data-act="section" data-c="' + attr(c.id) + '" data-s="' + attr(s.id) + '">' +
+          return '<div class="' + cls + '" data-f' + (s === c.sections[0] ? ' data-default' : '') + ' data-key="s:' + attr(s.id) + '" data-act="section" data-c="' + attr(c.id) + '" data-s="' + attr(s.id) + '">' +
             head +
             '<div class="dl">' + esc(plural(st.total, 'exercise', 'exercises') + ', ' + minutes(st.ms)) + '</div>' +
             (st.complete ? '<div class="badge">' + CHECK + '</div>' : '') +
@@ -742,8 +741,6 @@
       var c = findCourse(p.c);
       var s = findSection(c, p.s);
       var st = secStats(s);
-      var ri = st.complete ? 0 : resumeIndex(s);
-
       var name = s.group
         ? '<span class="g">' + esc(s.group) + '</span><span class="b">' + esc(s.label) + '</span>'
         : '<span class="b">' + esc(s.label) + '</span>';
@@ -758,7 +755,7 @@
         var d = isDone(l);
         var ref = ' data-c="' + attr(c.id) + '" data-s="' + attr(s.id) + '" data-i="' + i + '"';
         return '<div class="ex2' + (d ? ' done' : '') + '">' +
-          '<div class="vid" data-f' + (i === ri ? ' data-default' : '') + ' data-key="v:' + i + '"' + playAttrs(c, s, i) + '>' +
+          '<div class="vid" data-f' + (i === 0 ? ' data-default' : '') + ' data-key="v:' + i + '"' + playAttrs(c, s, i) + '>' +
             '<div class="th" data-bg="' + attr(l.thumb) + '"></div><div class="play"></div>' +
             (l.ms ? '<div class="len">' + clock(l.ms / 1000) + '</div>' : '') + '</div>' +
           '<div class="info">' +
