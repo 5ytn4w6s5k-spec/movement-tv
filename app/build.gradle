@@ -9,7 +9,8 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId 'app.movementtv'
+        // New ID so Fire TV treats this as a fresh app (it had cached the old icon).
+        applicationId 'app.movementskool.tv'
         minSdk 22
         targetSdk 34
         versionCode buildNumber
