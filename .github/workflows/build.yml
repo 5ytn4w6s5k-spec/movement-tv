@@ -19,11 +19,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # Project updates can be uploaded as a single project.zip through the
-      # GitHub website; unpack it into the repo before building.
+      # GitHub website; unpack it into the repo before building. Changes to this
+      # workflow file itself have to be uploaded directly, since the build isn't
+      # allowed to edit workflow files.
       - name: Unpack uploaded project
         if: hashFiles('project.zip') != ''
         run: |
-          unzip -o -q project.zip -d .
+          unzip -o -q project.zip -d . -x '.github/*'
           git rm -q project.zip
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
@@ -55,11 +57,26 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         run: cp app/build/outputs/apk/release/app-release.apk MovementSkool.apk
 
+      - name: Package the Chrome extension
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          rm -rf MovementSkool-Chrome
+          cp -r chrome-extension MovementSkool-Chrome
+          rm -f MovementSkool-Chrome/README.md
+          cp app/src/main/assets/web/app.js MovementSkool-Chrome/
+          mkdir -p MovementSkool-Chrome/fonts
+          cp app/src/main/assets/web/fonts/archivo.woff2 MovementSkool-Chrome/fonts/
+          # The extension loads the font itself, so drop the page-relative @font-face rule.
+          sed '/^@font-face {/,/^}/d' app/src/main/assets/web/app.css > MovementSkool-Chrome/app.css
+          zip -q -r MovementSkool-Chrome.zip MovementSkool-Chrome
+
       - uses: actions/upload-artifact@v4
         if: steps.check.outputs.ready == 'true'
         with:
           name: MovementSkool
-          path: MovementSkool.apk
+          path: |
+            MovementSkool.apk
+            MovementSkool-Chrome.zip
 
       - name: Publish as the latest download
         if: steps.check.outputs.ready == 'true'
@@ -67,7 +84,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest MovementSkool.apk \
+          gh release create latest MovementSkool.apk MovementSkool-Chrome.zip \
             --title "Movement Skool for Firestick" \
             --notes "Build ${{ github.run_number }}" \
             --latest
