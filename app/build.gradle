@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'app.movementtv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'app.movementtv'
+        minSdk 22
+        targetSdk 34
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('../keystore/release.jks')
+            storePassword System.getenv('MTV_KEYSTORE_PASSWORD') ?: 'movementtv'
+            keyAlias 'movementtv'
+            keyPassword System.getenv('MTV_KEYSTORE_PASSWORD') ?: 'movementtv'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
