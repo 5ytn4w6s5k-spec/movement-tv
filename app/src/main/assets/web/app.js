@@ -892,6 +892,7 @@
     P.playing = false;
     P.ended = false;
     P.gotMsg = false;
+    P.startFixed = false;
     P.mode = 'play';
     $('pl-panel').innerHTML = '';
     $('pl-where').textContent = c.title + ', ' + sectionName(s);
@@ -917,7 +918,7 @@
       f.src = 'https://www.youtube.com/embed/' + v.id + '?' + qs({
         enablejsapi: 1, autoplay: 1, controls: 0, rel: 0, playsinline: 1, iv_load_policy: 3,
         disablekb: 1, fs: 0, modestbranding: 1, cc_load_policy: 0, origin: window.location.origin,
-        start: v.start || undefined
+        start: v.start || 0
       });
     } else {
       P.kind = 'vimeo';
@@ -925,7 +926,7 @@
       f.src = 'https://player.vimeo.com/video/' + v.id + '?' + qs({
         h: v.hash || undefined, autoplay: 1, title: 0, byline: 0, portrait: 0, dnt: 1,
         controls: 0, keyboard: 0, pip: 0
-      }) + (v.start ? '#t=' + v.start + 's' : '');
+      }) + '#t=' + (v.start || 0) + 's';
     }
     f.onload = function () { if (P.iframe === f && P.kind === 'youtube') ytHandshake(); };
     playerEl.appendChild(f);
@@ -961,7 +962,10 @@
       var info = data.info;
       if (ev === 'onReady') ytCmd('playVideo');
       if ((ev === 'infoDelivery' || ev === 'initialDelivery') && info && typeof info === 'object') {
-        if (typeof info.currentTime === 'number') P.t = info.currentTime;
+        if (typeof info.currentTime === 'number') {
+          P.t = info.currentTime;
+          ensureStart();
+        }
         if (info.duration) P.d = info.duration;
         if (typeof info.playerState === 'number') ytState(info.playerState);
         updateTime();
@@ -971,11 +975,13 @@
     } else if (P.kind === 'vimeo') {
       if (ev === 'ready') {
         ['ended', 'timeupdate', 'play', 'pause', 'error'].forEach(function (name) { post({ method: 'addEventListener', value: name }); });
+        post({ method: 'setCurrentTime', value: P.lesson.video.start || 0 });
         post({ method: 'play' });
       }
       // Older Vimeo players report playProgress/finish instead of timeupdate/ended.
       if ((ev === 'timeupdate' || ev === 'playProgress') && data.data) {
         P.t = data.data.seconds || 0;
+        ensureStart();
         if (data.data.duration) P.d = data.data.duration;
         if (!P.playing) setPlaying(true);
         updateTime();
@@ -986,6 +992,20 @@
       if (ev === 'error') playerError();
     }
   });
+
+  // Videos always start from the beginning (or the lesson's own start point),
+  // even if YouTube or Vimeo remembers where you stopped last time.
+  function ensureStart() {
+    if (P.startFixed) return;
+    P.startFixed = true;
+    var start = P.lesson.video.start || 0;
+    if (Math.abs(P.t - start) > 3) {
+      if (P.kind === 'youtube') ytCmd('seekTo', [start, true]);
+      else if (P.kind === 'vimeo') post({ method: 'setCurrentTime', value: start });
+      P.t = start;
+      updateTime();
+    }
+  }
 
   function ytState(s) {
     if (s === 1) setPlaying(true);
