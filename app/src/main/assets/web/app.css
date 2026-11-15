@@ -79,6 +79,7 @@ body.is-playing #player { display: block; }
 .brand img { width: 60px; height: 60px; border-radius: 12px; margin-right: 20px; object-fit: cover; background: var(--track); }
 .crumb { font-size: 30px; color: var(--muted); margin-left: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar .spacer { flex: 1; }
+.update-note { font-size: 24px; font-weight: 600; color: var(--text); background: #FFF4D6; border: 1px solid #F0D58A; border-radius: 10px; padding: 12px 20px; margin-right: 24px; }
 
 .btn {
   display: inline-flex;

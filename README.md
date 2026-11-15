@@ -23,4 +23,6 @@ A Fire TV app for The Movement Skool. It signs in to Skool once, then shows ever
 - `app/src/main/assets/web/` holds the screens (HTML, CSS, JavaScript).
 - The Android app serves those files as if they were part of skool.com, so they can read your programs with your normal Skool sign-in. Videos play through Skool's own YouTube and Vimeo links.
 - Progress comes from Skool. Pressing Done marks the lesson complete on Skool itself, so it shows up on the phone app and website too.
+- The app loads its screens from the latest version of `app/src/main/assets/web/` in this repo each time it opens (and after it's been in the background for a while), so changes to the screens show up without reinstalling. It keeps the last version it loaded for when the internet is down, and falls back to the copy built into the app.
+- Changes to the Android side (`MainActivity.java`, the manifest, the icon and banner) need a reinstall. Raise `SHELL_VERSION` in `MainActivity.java` and `SHELL_LATEST` in `app.js` together, and the app shows a reinstall note until it's updated.
 - Every push to `main` builds a new `MovementSkool.apk` and publishes it as the latest release.

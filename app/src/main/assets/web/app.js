@@ -2,6 +2,8 @@
   'use strict';
 
   var GROUP = 'movement';
+  // Raise this when the Android shell changes in a way that needs a reinstall.
+  var SHELL_LATEST = 2;
   var W = 1920;
   var H = 1080;
 
@@ -528,6 +530,8 @@
 
   // Called by the Fire TV app for Back and media buttons.
   window.mtvKey = function (k) { return handle(k); };
+  // The Fire TV app asks this before reloading to pick up newer screens.
+  window.mtvCanReload = function () { var c = current(); return !c || c.name !== 'player'; };
   window.mtvBack = function () { return handle('back'); };
 
   var toastTimer = null;
@@ -592,10 +596,18 @@
   /* Shared markup                                                       */
   /* ------------------------------------------------------------------ */
 
+  function shellOutdated() {
+    if (!nativeApp) return false;
+    var v = 1;
+    try { if (nativeApp.shellVersion) v = nativeApp.shellVersion(); } catch (e) { v = 1; }
+    return v < SHELL_LATEST;
+  }
+
   function topBar(withRefresh) {
     var logo = catalog && catalog.logo ? '<img src="' + attr(catalog.logo) + '" alt="">' : '';
     return '<div class="topbar"><div class="brand">' + logo + esc(catalog ? catalog.name : 'The Movement Skool') + '</div>' +
       '<div class="spacer"></div>' +
+      (withRefresh && shellOutdated() ? '<div class="update-note">App update ready: enter 1080385 in Downloader</div>' : '') +
       (withRefresh ? '<div class="btn small" data-f data-key="refresh" data-act="refresh">Refresh</div>' : '') +
       '</div>';
   }
