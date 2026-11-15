@@ -1,6 +1,6 @@
 # Movement Skool for Firestick
 
-A Fire TV app for The Movement Skool. It signs in to Skool once, then shows every program as a card. Pick a program to see its days, pick a day to get a scrolling list of that day's exercises, and play any exercise full screen.
+A Fire TV app for The Movement Skool. It signs in to Skool once, then shows every program as a card. Pick a program to see its days, pick a day to get a scrolling list of that day's exercises with the coach's notes (sets, reps, cues) next to each video. Play any exercise full screen, and press Done to mark it complete on Skool.
 
 ## Install on the Firestick
 
@@ -13,8 +13,8 @@ A Fire TV app for The Movement Skool. It signs in to Skool once, then shows ever
 
 | Button | On a list | While a video plays |
 | --- | --- | --- |
-| Arrows | Move around | Left/right: previous or next exercise |
-| OK | Open | Pause or play |
+| Arrows | Move around | Left/right: back or ahead 10 seconds |
+| OK | Open, play, or press Done | Pause or play |
 | Rewind / fast-forward | | Back or ahead 10 seconds |
 | Back | Go back a screen | Back to the exercise list |
 
@@ -22,5 +22,5 @@ A Fire TV app for The Movement Skool. It signs in to Skool once, then shows ever
 
 - `app/src/main/assets/web/` holds the screens (HTML, CSS, JavaScript).
 - The Android app serves those files as if they were part of skool.com, so they can read your programs with your normal Skool sign-in. Videos play through Skool's own YouTube and Vimeo links.
-- Progress you make on the TV is kept on the TV. Lessons you've already completed on Skool show as done.
+- Progress comes from Skool. Pressing Done marks the lesson complete on Skool itself, so it shows up on the phone app and website too.
 - Every push to `main` builds a new `MovementSkool.apk` and publishes it as the latest release.

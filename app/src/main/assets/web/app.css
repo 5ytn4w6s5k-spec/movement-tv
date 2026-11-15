@@ -169,72 +169,97 @@ body.is-playing #player { display: block; }
 .tile.next { box-shadow: inset 0 0 0 3px var(--green); border-color: var(--green); }
 .tile.is-f { transform: scale(1.06); border-color: transparent; box-shadow: 0 0 0 5px var(--focus), 0 18px 36px rgba(32, 33, 36, 0.22); }
 
-/* ---------- day: scrolling list of exercises ---------- */
+/* ---------- day: header band + exercises (video and notes side by side) ---------- */
 
-.d-side { position: absolute; left: 112px; top: 176px; width: 620px; }
-.d-side .course { font-size: 34px; font-weight: 500; color: var(--muted); margin-bottom: 22px; }
-.group-line { font-size: 76px; font-weight: 300; line-height: 1; letter-spacing: -1px; font-variation-settings: 'wdth' 125; white-space: nowrap; }
-.big-line { font-size: 176px; font-weight: 800; line-height: 0.95; letter-spacing: -3px; font-variation-settings: 'wdth' 125; white-space: nowrap; overflow: hidden; }
-.big-line.word { font-size: 96px; letter-spacing: -1px; white-space: normal; line-height: 1; }
-.d-side .sum { font-size: 32px; color: var(--muted); margin-top: 28px; }
-.d-side .pill { margin-top: 26px; width: 420px; }
-
-.d-list { position: absolute; left: 770px; right: 0; top: 120px; bottom: 0; }
-.d-list .vs-inner { padding: 48px 112px 400px 30px; }
-.ex {
-  display: flex;
-  align-items: center;
+.day-head {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 270px;
   box-sizing: border-box;
-  padding: 24px;
+  padding: 0 112px 34px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  z-index: 3;
+}
+.day-head .titles { flex: 1; min-width: 0; }
+.day-head .course { font-size: 32px; font-weight: 500; color: var(--muted); margin-bottom: 12px; }
+.day-head .name {
+  font-size: 140px;
+  line-height: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  font-variation-settings: 'wdth' 125;
+}
+.day-head .name .g { font-size: 0.56em; font-weight: 300; letter-spacing: -1px; margin-right: 0.3em; }
+.day-head .name .b { font-weight: 800; letter-spacing: -3px; }
+.day-head .name.word .b { letter-spacing: -2px; }
+.day-head .prog { width: 440px; flex: none; margin-left: 48px; font-size: 26px; color: var(--muted); text-align: right; padding-bottom: 8px; }
+.day-head .prog .pill { margin-top: 14px; text-align: left; }
+
+.d-list2 { position: absolute; top: 270px; left: 0; right: 0; bottom: 0; }
+.d-list2 .vs-inner { padding: 40px 112px 420px; }
+.ex2 {
+  display: flex;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 28px;
   margin-bottom: 28px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 18px;
+}
+.ex2 .vid {
+  position: relative;
+  width: 720px; height: 405px;
+  flex: none;
+  border-radius: 14px;
   transition: transform 0.12s ease;
 }
-.ex .th {
-  position: relative;
-  width: 480px; height: 270px;
-  flex: none;
-  border-radius: 12px;
-  margin-right: 34px;
-  background: var(--track) center / cover no-repeat;
-}
-.ex .play {
+.ex2 .vid .th { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 14px; background: var(--track) center / cover no-repeat; }
+.ex2 .play {
   position: absolute;
   left: 50%; top: 50%;
-  width: 88px; height: 88px;
-  margin: -44px 0 0 -44px;
+  width: 96px; height: 96px;
+  margin: -48px 0 0 -48px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
-.ex .play::after {
+.ex2 .play::after {
   content: '';
   position: absolute;
-  left: 34px; top: 26px;
+  left: 37px; top: 28px;
   border-style: solid;
-  border-width: 18px 0 18px 30px;
+  border-width: 20px 0 20px 33px;
   border-color: transparent transparent transparent var(--text);
 }
-.ex .len {
+.ex2 .len {
   position: absolute;
-  right: 12px; bottom: 12px;
+  right: 14px; bottom: 14px;
   padding: 4px 12px;
   border-radius: 8px;
   background: rgba(32, 33, 36, 0.82);
   color: #FFFFFF;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
 }
-.ex .tx { flex: 1; min-width: 0; }
-.ex .k { font-size: 26px; color: var(--muted); }
-.ex .t { font-size: 40px; font-weight: 700; line-height: 1.12; margin-top: 10px; max-height: 135px; overflow: hidden; }
-.ex .s { font-size: 28px; color: var(--muted); margin-top: 18px; }
-.ex.done .s { color: var(--green); font-weight: 600; }
-.ex.is-f { transform: scale(1.03); border-color: transparent; box-shadow: 0 0 0 5px var(--focus), 0 22px 44px rgba(32, 33, 36, 0.22); }
-.ex.is-f .play { background: var(--green); }
-.ex.is-f .play::after { border-left-color: #FFFFFF; }
+.ex2 .vid.is-f { transform: scale(1.03); box-shadow: 0 0 0 5px var(--focus), 0 22px 44px rgba(32, 33, 36, 0.25); }
+.ex2 .vid.is-f .play { background: var(--green); }
+.ex2 .vid.is-f .play::after { border-left-color: #FFFFFF; }
+
+.ex2 .info { flex: 1; min-width: 0; margin-left: 48px; padding-top: 6px; }
+.ex2 .k { font-size: 26px; color: var(--muted); }
+.ex2 .t { font-size: 48px; font-weight: 700; line-height: 1.1; margin-top: 8px; }
+.ex2 .notes { margin-top: 22px; font-size: 36px; line-height: 1.35; }
+.ex2 .notes .line { margin-bottom: 10px; }
+.ex2 .notes .none { font-size: 28px; color: var(--muted); }
+.ex2 .done-btn { margin-top: 26px; margin-right: 0; }
+.ex2 .done-btn .check { margin-right: 10px; }
+.ex2 .done-btn.on { background: var(--green); color: #FFFFFF; }
+.ex2 .done-btn.is-f { background: var(--focus); color: #FFFFFF; }
+.ex2.done .k::after { content: ' \2713'; color: var(--green); font-weight: 700; }
 
 /* ---------- player overlay (on top of the video) ---------- */
 
@@ -246,6 +271,7 @@ body.is-playing #player { display: block; }
 .pl .where { font-size: 30px; color: rgba(255, 255, 255, 0.75); }
 .pl .now { font-size: 74px; font-weight: 700; line-height: 1.05; margin-top: 10px; }
 .pl .of { font-size: 36px; font-weight: 300; margin-top: 14px; font-variation-settings: 'wdth' 125; }
+.pl .pnotes { font-size: 34px; margin-top: 16px; color: rgba(255, 255, 255, 0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl .bottom { position: absolute; left: 112px; right: 112px; bottom: 64px; }
 .pl .prog { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.28); overflow: hidden; }
 .pl .prog i { display: block; height: 100%; background: var(--green); }

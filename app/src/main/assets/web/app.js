@@ -204,12 +204,91 @@
   /* ------------------------------------------------------------------ */
 
   var catalog = load('catalog', null);
-  var doneMap = load('done', {});
   var recent = load('recent', {});
+  var notesCache = load('notes', {});
+  // Older versions kept TV-only checkmarks; progress now lives on Skool.
+  try { localStorage.removeItem('mtv.done'); } catch (e) { /* ignore */ }
 
-  function isDone(l) { return !!(doneMap[l.id] || l.skoolDone); }
-  function markDone(l) {
-    if (l && !doneMap[l.id]) { doneMap[l.id] = Date.now(); save('done', doneMap); }
+  function isDone(l) { return !!l.skoolDone; }
+
+  function cookie(name) {
+    var m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
+    return m ? m[1] : '';
+  }
+
+  // Marks a lesson complete (or not) on Skool itself, the same way the Skool site does.
+  function setDone(l, done) {
+    var headers = { 'content-type': 'application/json' };
+    var waf = cookie('aws-waf-token');
+    if (waf) headers['x-aws-waf-token'] = waf;
+    return fetch('https://api2.skool.com/courses/' + encodeURIComponent(l.mid) + (done ? '/mark-done' : '/mark-undone'), {
+      method: 'POST', credentials: 'include', headers: headers
+    }).then(function (res) {
+      if (!res.ok) throw new AppError(res.status === 401 || res.status === 403 ? 'signin' : 'network', 'HTTP ' + res.status);
+      l.skoolDone = done;
+      save('catalog', catalog);
+    }, function () { throw new AppError('network'); });
+  }
+
+  /* ---------- coach's notes (sets, reps, cues) ---------- */
+
+  // Skool stores lesson text as rich-text JSON prefixed with [v2]; turn it into plain lines.
+  function descLines(desc) {
+    if (!desc) return [];
+    var raw = String(desc);
+    var lines = [];
+    var cur = '';
+    function push() { var t = cur.replace(/\s+/g, ' ').trim(); if (t) lines.push(t); cur = ''; }
+    try {
+      var json = JSON.parse(raw.replace(/^\[v\d+\]/, ''));
+      (function walk(n) {
+        if (Array.isArray(n)) { n.forEach(walk); return; }
+        if (!n || typeof n !== 'object') return;
+        if (n.type === 'text' && n.text) cur += n.text;
+        if (n.type === 'hardBreak') push();
+        if (n.content) walk(n.content);
+        if (n.type === 'paragraph' || n.type === 'heading' || n.type === 'listItem') push();
+      })(json);
+      push();
+    } catch (e) {
+      raw.replace(/<[^>]+>/g, '\n').split(/\n+/).forEach(function (t) { cur = t; push(); });
+    }
+    return lines;
+  }
+
+  var NOTES_MAX_AGE = 3 * 24 * 3600 * 1000;
+  function notesFor(l) { var n = notesCache[l.id]; return n ? n.x : null; }
+
+  function fetchNotes(c, l) {
+    return nextData('/' + GROUP + '/classroom/' + encodeURIComponent(c.id) + '?md=' + encodeURIComponent(l.mid)).then(function (d) {
+      var tree = d && d.props && d.props.pageProps && d.props.pageProps.course;
+      var found = null;
+      (function walk(n) {
+        if (!n || found) return;
+        var node = n.course || n;
+        if (node.id === l.mid) { found = node; return; }
+        (n.children || []).forEach(walk);
+      })(tree);
+      var lines = descLines(found && found.metadata && found.metadata.desc);
+      notesCache[l.id] = { x: lines, at: Date.now() };
+      save('notes', notesCache);
+      return lines;
+    });
+  }
+
+  // Load notes for a day's exercises a couple at a time, updating rows as they arrive.
+  function loadDayNotes(c, s, onEach) {
+    var todo = s.lessons.filter(function (l) {
+      var n = notesCache[l.id];
+      return !n || Date.now() - n.at > NOTES_MAX_AGE;
+    });
+    var next = 0;
+    function worker() {
+      if (next >= todo.length) return Promise.resolve();
+      var l = todo[next++];
+      return fetchNotes(c, l).then(function (lines) { onEach(l, lines); }, function () { onEach(l, notesFor(l)); }).then(worker);
+    }
+    return Promise.all([worker(), worker()]);
   }
   function touch(course) { recent[course.id] = Date.now(); save('recent', recent); }
 
@@ -481,8 +560,32 @@
       else window.location.href = path;
     },
     retryvideo: function () { loadLesson(current().p); },
-    skipvideo: function () { nextExercise(); },
-    tolist: function () { returnToList(P.ctx ? P.ctx.i : 0); }
+    skipvideo: function () {
+      if (P.ctx.i + 1 < P.ctx.s.lessons.length) advance(P.ctx.i + 1);
+      else returnToList('d:' + P.ctx.i);
+    },
+    tolist: function () { returnToList(P.ctx ? 'v:' + P.ctx.i : null); },
+    toggleDone: function (el) {
+      if (el.getAttribute('data-busy')) return;
+      var c = findCourse(el.getAttribute('data-c'));
+      var s = findSection(c, el.getAttribute('data-s'));
+      var i = parseInt(el.getAttribute('data-i'), 10) || 0;
+      var l = s && s.lessons[i];
+      if (!l) return;
+      var want = !isDone(l);
+      var before = el.innerHTML;
+      el.setAttribute('data-busy', '1');
+      el.textContent = 'Saving\u2026';
+      setDone(l, want).then(function () {
+        var cur = current();
+        if (cur && cur.name === 'day') { cur.focus = 'd:' + i; render(); }
+        toast(want ? 'Marked done on Skool' : 'Marked not done on Skool');
+      }, function (e) {
+        el.removeAttribute('data-busy');
+        el.innerHTML = before;
+        toast(e && e.kind === 'signin' ? 'Skool signed you out. Sign in again to save progress.' : 'Couldn\'t save to Skool. Try again.');
+      });
+    }
   };
 
   /* ------------------------------------------------------------------ */
@@ -570,7 +673,14 @@
     }
   };
 
-  // 3. A day: scrolling list of exercises
+  // 3. A day: header band, then a scrolling list of exercises (video + coach's notes)
+  function notesHtml(l) {
+    var lines = notesFor(l);
+    if (lines === null) return '<div class="none">Loading notes\u2026</div>';
+    if (!lines.length) return '<div class="none">No notes for this one. Watch the video for the details.</div>';
+    return lines.map(function (t) { return '<div class="line">' + esc(t) + '</div>'; }).join('');
+  }
+
   screens.day = {
     valid: function (p) { return !!findSection(findCourse(p.c), p.s); },
     html: function (p) {
@@ -579,29 +689,43 @@
       var st = secStats(s);
       var ri = st.complete ? 0 : resumeIndex(s);
 
-      var sum = plural(st.total, 'exercise', 'exercises') + ', about ' + minutes(st.ms) + '.';
-      if (st.complete) sum += ' All done.';
-      else if (st.done) sum += ' ' + st.done + ' done.';
+      var name = s.group
+        ? '<span class="g">' + esc(s.group) + '</span><span class="b">' + esc(s.label) + '</span>'
+        : '<span class="b">' + esc(s.label) + '</span>';
 
-      var list = s.lessons.map(function (l, i) {
+      var head = '<div class="day-head"><div class="titles">' +
+          '<div class="course">' + esc(c.title) + '</div>' +
+          '<div class="name' + (s.kind === 'word' ? ' word' : '') + '" data-fit="40">' + name + '</div></div>' +
+        '<div class="prog"><div>' + st.done + ' of ' + plural(st.total, 'exercise', 'exercises') + ' done, about ' + minutes(st.ms) + '</div>' +
+          pill(st.done, st.total) + '</div></div>';
+
+      var rows = s.lessons.map(function (l, i) {
         var d = isDone(l);
-        return '<div class="ex' + (d ? ' done' : '') + '" data-f' + (i === ri ? ' data-default' : '') + ' data-key="e:' + i + '"' + playAttrs(c, s, i) + '>' +
-          '<div class="th" data-bg="' + attr(l.thumb) + '"><div class="play"></div>' +
+        var ref = ' data-c="' + attr(c.id) + '" data-s="' + attr(s.id) + '" data-i="' + i + '"';
+        return '<div class="ex2' + (d ? ' done' : '') + '">' +
+          '<div class="vid" data-f' + (i === ri ? ' data-default' : '') + ' data-key="v:' + i + '"' + playAttrs(c, s, i) + '>' +
+            '<div class="th" data-bg="' + attr(l.thumb) + '"></div><div class="play"></div>' +
             (l.ms ? '<div class="len">' + clock(l.ms / 1000) + '</div>' : '') + '</div>' +
-          '<div class="tx"><div class="k">Exercise ' + (i + 1) + ' of ' + s.lessons.length + '</div>' +
+          '<div class="info">' +
+            '<div class="k">Exercise ' + (i + 1) + ' of ' + s.lessons.length + '</div>' +
             '<div class="t">' + esc(l.title) + '</div>' +
-            '<div class="s">' + (d ? CHECK + ' Done' : esc(minutes(l.ms))) + '</div></div></div>';
+            '<div class="notes" id="notes-' + i + '">' + notesHtml(l) + '</div>' +
+            '<div class="btn done-btn' + (d ? ' on' : '') + '" data-f data-key="d:' + i + '" data-act="toggleDone"' + ref + '>' +
+              (d ? CHECK + ' Done' : 'Mark done') + '</div>' +
+          '</div></div>';
       }).join('');
 
-      return topBar(false) +
-        '<div class="d-side">' +
-          '<div class="course">' + esc(c.title) + '</div>' +
-          (s.group ? '<div class="group-line">' + esc(s.group) + '</div>' : '') +
-          '<div class="big-line' + (s.kind === 'word' ? ' word' : '') + '" data-fit="64">' + esc(s.label) + '</div>' +
-          '<div class="sum">' + esc(sum) + '</div>' +
-          pill(st.done, st.total) +
-        '</div>' +
-        '<div class="d-list"><div class="vs" data-scroll="y" data-group="list"><div class="vs-inner">' + list + '</div></div></div>';
+      return head + '<div class="d-list2"><div class="vs" data-scroll="y"><div class="vs-inner">' + rows + '</div></div></div>';
+    },
+    after: function (p, entry) {
+      var c = findCourse(p.c);
+      var s = findSection(c, p.s);
+      loadDayNotes(c, s, function (l) {
+        if (current() !== entry) return;
+        var i = s.lessons.indexOf(l);
+        var box = $('notes-' + i);
+        if (box) box.innerHTML = notesHtml(l);
+      });
     }
   };
 
@@ -654,13 +778,12 @@
     html: function () {
       return '<div class="pl" id="pl">' +
         '<div class="scrim-top"></div><div class="scrim-bot"></div>' +
-        '<div class="info"><div class="where" id="pl-where"></div><div class="now" id="pl-now"></div><div class="of" id="pl-of"></div></div>' +
+        '<div class="info"><div class="where" id="pl-where"></div><div class="now" id="pl-now"></div><div class="of" id="pl-of"></div><div class="pnotes" id="pl-notes"></div></div>' +
         '<div class="bottom"><div class="prog"><i id="pl-bar"></i></div>' +
           '<div class="times"><span id="pl-t">0:00</span><span class="state" id="pl-state">Loading</span><span id="pl-d"></span></div>' +
           '<div class="hints">' +
             '<span class="hint"><span class="key">OK</span><span id="pl-okhint">Pause</span></span>' +
-            '<span class="hint"><span class="key">&#9194; &#9193;</span>Back or ahead 10 seconds</span>' +
-            '<span class="hint"><span class="key">&#9664; &#9654;</span>Previous or next exercise</span>' +
+            '<span class="hint"><span class="key">&#9664; &#9654;</span>Back or ahead 10 seconds</span>' +
             '<span class="hint"><span class="key">Back</span>Exercise list</span>' +
           '</div></div>' +
         '</div><div id="pl-panel"></div>';
@@ -676,14 +799,12 @@
       P.mode = 'play';
     },
     key: function (k) {
-      if (k === 'back') { returnToList(P.ctx ? P.ctx.i : 0); return true; }
+      if (k === 'back') { returnToList(P.ctx ? 'v:' + P.ctx.i : null); return true; }
       if (P.mode !== 'play') return false; // error panel uses normal button focus
       showOverlay();
-      if (k === 'left') { previousExercise(); return true; }
-      if (k === 'right') { nextExercise(); return true; }
       if (k === 'ok' || k === 'playpause') { togglePlay(); return true; }
-      if (k === 'rew') { seekBy(-10); return true; }
-      if (k === 'ff') { seekBy(10); return true; }
+      if (k === 'left' || k === 'rew') { seekBy(-10); return true; }
+      if (k === 'right' || k === 'ff') { seekBy(10); return true; }
       if (k === 'pause') { if (P.playing) togglePlay(); return true; }
       if (k === 'up' || k === 'down') return true;
       return false;
@@ -699,13 +820,10 @@
     playerEl.innerHTML = '';
   }
 
-  // Back to the day's list, with the given exercise selected.
-  function returnToList(index) {
+  // Back to the day's list, with the given item ('v:2' = video 3, 'd:2' = its Done button) selected.
+  function returnToList(focusKey) {
     var below = stack[stack.length - 2];
-    if (below && below.name === 'day' && P.ctx) {
-      var n = P.ctx.s.lessons.length;
-      below.focus = 'e:' + Math.max(0, Math.min(n - 1, index));
-    }
+    if (below && below.name === 'day' && focusKey) below.focus = focusKey;
     if (!back()) reset('home');
   }
 
@@ -726,6 +844,7 @@
     $('pl-where').textContent = c.title + ', ' + sectionName(s);
     $('pl-now').textContent = l.title;
     $('pl-of').textContent = 'Exercise ' + (p.i + 1) + ' of ' + s.lessons.length;
+    $('pl-notes').textContent = (notesFor(l) || []).join('   ');
     $('pl-state').textContent = 'Loading';
     $('pl-okhint').textContent = 'Pause';
     updateTime();
@@ -872,27 +991,13 @@
     loadLesson(cur.p);
   }
 
-  function previousExercise() {
-    var start = P.lesson.video.start || 0;
-    if (P.t - start > 8 || P.ctx.i === 0) { P.t = start; seekBy(0); return; }
-    advance(P.ctx.i - 1);
-  }
-
-  function nextExercise() {
-    if (P.d && P.t / P.d > 0.6) markDone(P.lesson);
-    if (P.ctx.i + 1 < P.ctx.s.lessons.length) advance(P.ctx.i + 1);
-    else returnToList(P.ctx.i);
-  }
-
-  // When a video finishes: check it off and go back to the list on the next one.
+  // When a video finishes, go back to the list with its Done button ready to press.
   function onEnded() {
     if (P.ended) return;
     P.ended = true;
-    markDone(P.lesson);
-    var s = P.ctx.s;
-    var last = P.ctx.i + 1 >= s.lessons.length;
-    if (last && secStats(s).complete) toast(sectionName(s) + ' done');
-    returnToList(last ? P.ctx.i : P.ctx.i + 1);
+    var i = P.ctx.i;
+    var hasNext = i + 1 < P.ctx.s.lessons.length;
+    returnToList(!isDone(P.lesson) ? 'd:' + i : (hasNext ? 'v:' + (i + 1) : 'd:' + i));
   }
 
   function playerError() {
